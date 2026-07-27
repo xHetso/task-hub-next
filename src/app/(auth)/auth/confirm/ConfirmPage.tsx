@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { createClient } from '@/utils/supabase/client'
 
@@ -11,28 +11,45 @@ import { PublicPages } from '@/config/public-pages'
 export function ConfirmPage() {
 	const params = useSearchParams()
 	const router = useRouter()
+	const handled = useRef(false)
 
 	useEffect(() => {
+		if (handled.current) return
+		handled.current = true
+
 		const verifyToken = async () => {
-			const token_hash = params.get('token_hash')
-			if (!token_hash) {
+			const errorDescription = params.get('error_description')
+
+			if (errorDescription) {
 				return router.replace(PublicPages.LOGIN)
 			}
 
-			const { error } = await createClient().auth.verifyOtp({
-				type: 'email',
-				token_hash
-			})
+			const supabase = createClient()
+			const code = params.get('code')
 
-			// TODO: Also create a profile for the user
+			if (code) {
+				const { error } = await supabase.auth.exchangeCodeForSession(code)
+				if (error) return router.replace(PublicPages.LOGIN)
+				return router.replace(DashboardPages.BASE)
+			}
 
-			if (error) return router.replace(PublicPages.LOGIN)
+			const token_hash = params.get('token_hash')
+			const type = params.get('type') ?? 'email'
 
-			router.replace(DashboardPages.BASE)
+			if (token_hash) {
+				const { error } = await supabase.auth.verifyOtp({
+					type: type as 'email',
+					token_hash
+				})
+				if (error) return router.replace(PublicPages.LOGIN)
+				return router.replace(DashboardPages.BASE)
+			}
+
+			router.replace(PublicPages.LOGIN)
 		}
 
 		verifyToken()
-	}, [])
+	}, [params, router])
 
 	return <p>Verifying your email... Please wait.</p>
 }
