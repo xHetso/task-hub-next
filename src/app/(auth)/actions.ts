@@ -1,0 +1,13 @@
+import { createClient } from '@/utils/supabase/client'
+
+export async function signInWithEmail({ email }: { email: string }) {
+	const supabase = createClient()
+
+	return supabase.auth.signInWithOtp({
+		email,
+		options: {
+			shouldCreateUser: true,
+			emailRedirectTo: `${window.location.origin}/auth/confirm`
+		}
+	})
+}
